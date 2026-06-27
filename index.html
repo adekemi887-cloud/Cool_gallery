@@ -1,0 +1,570 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pinterest Mobile App</title>
+    
+    <link rel="preconnect" href="https://images.unsplash.com">
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    
+    <!-- ADDED: Global version script so the whole app knows about it -->
+    <script src="version.js"></script>
+
+    <!-- ADDED: Firebase and Backend Integration Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="server.js"></script>
+
+    <style>
+        :root { --bg-color: #ffffff; --text-main: #111111; --text-muted: #8e8e8e; --nav-bg: rgba(255, 255, 255, 0.95); --pin-radius: 16px; --spacing: 8px; --brand-red: #E60023; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        #app-container { width: 100%; max-width: 428px; height: 100vh; background-color: var(--bg-color); position: relative; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        
+        #dynamic-content { width: 100%; height: 100%; }
+        .page-container { width: 100%; height: 100%; display: none; }
+        
+        /* Toast Notification */
+        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: #fff; padding: 14px 24px; border-radius: 30px; font-size: 15px; font-weight: 500; opacity: 0; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); z-index: 9999; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* Upload Progress Bubble */
+        #upload-progress-bubble { position: fixed; top: 16px; left: 16px; background: rgba(0,0,0,0.85); color: #fff; padding: 10px 16px; border-radius: 24px; font-weight: 600; font-size: 14px; z-index: 1000; display: none; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        
+        /* Bottom Nav */
+        .bottom-nav { position: absolute; bottom: 0; left: 0; width: 100%; height: 65px; background: var(--nav-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); z-index: 100; transition: transform 0.3s ease; }
+        .nav-item { display: flex; justify-content: center; align-items: center; width: 50px; height: 50px; cursor: pointer; position: relative; color: var(--text-muted); transition: color 0.2s ease, transform 0.2s ease; }
+        .nav-item.active { color: var(--text-main); }
+        .nav-item:active { transform: scale(0.9); }
+        .nav-item ion-icon { font-size: 26px; }
+        .notification-dot { position: absolute; top: 10px; right: 8px; width: 10px; height: 10px; background-color: var(--brand-red); border-radius: 50%; border: 2px solid #fff; }
+
+        /* Skeleton Shimmer */
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        .skeleton-bg { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        
+        #skeleton-loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-color); z-index: 50; padding: var(--spacing) var(--spacing) 80px var(--spacing); display: none; }
+        #skeleton-loader.active { display: block; }
+        .masonry-grid { column-count: 2; column-gap: var(--spacing); }
+        .skeleton-card { border-radius: var(--pin-radius); margin-bottom: 16px; break-inside: avoid; }
+
+        /* Feed Styles */
+        .app-header { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: flex-end; padding: 16px 16px 0 0; z-index: 90; pointer-events: none; }
+        .glass-icon { width: 38px; height: 38px; margin-left: 10px; display: flex; justify-content: center; align-items: center; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 50%; pointer-events: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.08); cursor: pointer; color: var(--text-main); position: relative; }
+        .glass-icon ion-icon { font-size: 22px; }
+        .feed-scroll-area { height: 100%; overflow-y: auto; padding: var(--spacing) var(--spacing) 80px var(--spacing); -ms-overflow-style: none; scrollbar-width: none; }
+        .feed-scroll-area::-webkit-scrollbar { display: none; }
+        .pin-card { break-inside: avoid; margin-bottom: 16px; display: flex; flex-direction: column; cursor: pointer; animation: fadeIn 0.4s ease; position: relative; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pin-image-wrapper { width: 100%; border-radius: var(--pin-radius); overflow: hidden; position: relative; }
+        .pin-footer { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 0 4px; }
+        .pin-title { font-size: 13px; font-weight: 500; color: var(--text-main); }
+        
+        /* 3 Dots Pin Dropdown */
+        .pin-options { position: relative; padding: 0 4px; display: flex; align-items: center; justify-content: center; }
+        .pin-options-trigger { font-size: 18px; color: var(--text-main); cursor: pointer; padding: 4px; }
+        .pin-dropdown { display: none; position: absolute; bottom: 30px; right: 0; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); flex-direction: column; overflow: hidden; min-width: 140px; z-index: 100; }
+        .pin-dropdown.active { display: flex; animation: dropFadeIn 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        .pin-drop-item { padding: 12px 16px; font-size: 14px; font-weight: 500; color: #111; cursor: pointer; border-bottom: 1px solid #f0f0f0; text-align: left; }
+
+        /* Detail View Stack */
+        .detail-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-color); z-index: 200; transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); display: flex; flex-direction: column; }
+        .detail-view.active { transform: translateX(0); }
+        .detail-header { position: absolute; top: 16px; left: 16px; z-index: 210; }
+        .detail-scroll-area { height: 100%; overflow-y: auto; padding-bottom: 40px; -ms-overflow-style: none; scrollbar-width: none;}
+        .detail-scroll-area::-webkit-scrollbar { display: none; }
+        .detail-main-img { width: 100%; height: 78vh; object-fit: cover; border-bottom-left-radius: 32px; border-bottom-right-radius: 32px; }
+        .detail-info { padding: 20px 16px; display: flex; justify-content: space-between; align-items: center; }
+        .detail-title-large { font-size: 22px; font-weight: 600; color: var(--text-main); flex: 1; padding-right: 12px; }
+        .action-btn { background: #efefef; color: var(--text-main); border-radius: 24px; padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        .action-btn.primary { background: var(--brand-red); color: white; }
+
+        @keyframes bounce-download { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        .bouncing-download ion-icon { animation: bounce-download 0.5s infinite cubic-bezier(0.25, 0.8, 0.25, 1); color: var(--brand-red) !important; }
+
+        /* Upload Sheets */
+        .create-backdrop { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 500; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .create-backdrop.active { opacity: 1; pointer-events: auto; }
+        .create-sheet { position: absolute; bottom: 0; left: 0; width: 100%; height: 32vh; min-height: 250px; background: #fff; border-top-left-radius: 32px; border-top-right-radius: 32px; z-index: 510; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); display: flex; flex-direction: column; padding: 24px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); }
+        .create-sheet.active { transform: translateY(0); }
+        .sheet-close-bar { width: 40px; height: 5px; background: #e0e0e0; border-radius: 10px; margin: 0 auto 24px auto; }
+        .sheet-icons-container { display: flex; justify-content: space-around; align-items: center; flex: 1; }
+        .sheet-item { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+        .sheet-icon-circle { width: 64px; height: 64px; border-radius: 50%; background: #f0f0f0; display: flex; justify-content: center; align-items: center; font-size: 28px; color: #111; transition: background 0.2s ease; }
+        
+        .upload-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 600; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); display: flex; flex-direction: column; }
+        .upload-overlay.active { transform: translateY(0); }
+        .upload-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid #efefef; }
+        .upload-header ion-icon { font-size: 28px; color: #111; cursor: pointer; }
+        .upload-title { font-size: 18px; font-weight: 600; }
+        .upload-body { padding: 24px 16px; flex: 1; overflow-y: auto; }
+        .selected-images-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 16px; -ms-overflow-style: none; scrollbar-width: none; }
+        .selected-images-container::-webkit-scrollbar { display: none; }
+        .selected-images-container img { width: 120px; height: 160px; object-fit: cover; border-radius: 12px; background: #efefef; flex-shrink: 0; }
+        .upload-input-group { margin-top: 20px; }
+        .upload-input-group label { display: block; font-size: 14px; color: #555; margin-bottom: 8px; font-weight: 500; }
+        .upload-input-group input { width: 100%; border: none; border-bottom: 2px solid #ddd; font-size: 20px; color: #111; padding: 8px 0; outline: none; }
+        .upload-footer { padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid #efefef; display: flex; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        
+        <!-- Global Toast Notification -->
+        <div id="app-toast" class="toast">Coming soon</div>
+
+        <div id="upload-progress-bubble"></div>
+
+        <div id="skeleton-loader">
+            <div class="masonry-grid">
+                <div class="skeleton-card skeleton-bg" style="height: 250px;"></div><div class="skeleton-card skeleton-bg" style="height: 180px;"></div>
+                <div class="skeleton-card skeleton-bg" style="height: 380px;"></div><div class="skeleton-card skeleton-bg" style="height: 300px;"></div>
+            </div>
+        </div>
+
+        <div id="dynamic-content"></div>
+
+        <nav class="bottom-nav">
+            <div class="nav-item active" data-page="home" data-icon="home"><ion-icon name="home"></ion-icon></div>
+            <div class="nav-item" data-page="search" data-icon="search"><ion-icon name="search-outline"></ion-icon></div>
+            <div class="nav-item action-add" data-icon="add"><ion-icon name="add"></ion-icon></div>
+            <div class="nav-item" data-page="community" data-icon="people"><ion-icon name="people-outline"></ion-icon><div class="notification-dot"></div></div>
+            <div class="nav-item" data-page="profile" data-icon="person"><ion-icon name="person-outline"></ion-icon></div>
+        </nav>
+
+        <!-- CREATE SHEET -->
+        <div class="create-backdrop" id="create-backdrop">
+            <div class="create-sheet" id="create-sheet">
+                <div class="sheet-close-bar"></div>
+                <div class="sheet-icons-container">
+                    <div class="sheet-item toast-trigger">
+                        <div class="sheet-icon-circle"><ion-icon name="document-outline"></ion-icon></div><span>File</span>
+                    </div>
+                    <input type="file" id="native-gallery-input" accept="image/*" multiple style="display: none;">
+                    
+                    <div class="sheet-item" id="trigger-gallery">
+                        <div class="sheet-icon-circle"><ion-icon name="images-outline"></ion-icon></div><span>Gallery</span>
+                    </div>
+                    <div class="sheet-item toast-trigger">
+                        <div class="sheet-icon-circle"><ion-icon name="camera-outline"></ion-icon></div><span>Camera</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UPLOAD PREVIEW -->
+        <div class="upload-overlay" id="upload-overlay">
+            <div class="upload-header">
+                <ion-icon name="close-outline" id="close-upload"></ion-icon>
+                <div class="upload-title">Create Pin</div><div style="width: 28px;"></div>
+            </div>
+            <div class="upload-body">
+                <div class="selected-images-container" id="upload-preview-images"></div>
+                <div class="upload-input-group"><label>Title</label><input type="text" id="upload-pin-title" placeholder="Give your Pin a name"></div>
+            </div>
+            <div class="upload-footer"><div class="action-btn primary" id="execute-upload">Upload to Feed</div></div>
+        </div>
+
+        <!-- Container where Authentication interface is injected -->
+        <div id="auth-injection-container"></div>
+
+    </div>
+
+    <script>
+        // Check local storage for persistent login state
+        window.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'; 
+        window.pendingUploadAction = null; 
+
+        // ADDED: Initialize as empty, `home.html` will populate this via Server API
+        window.pinsData = [];
+
+        const contentArea = document.getElementById('dynamic-content');
+        const skeletonLoader = document.getElementById('skeleton-loader');
+        const bNav = document.querySelector('.bottom-nav');
+        
+        window.loadedPages = {};
+        window.lastMainPage = 'home'; 
+
+        window.showToast = function(msg) {
+            let toast = document.getElementById('app-toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        };
+
+        window.navigateTo = async function(pageName) {
+            // Hide bottom nav if it's a sub-page
+            const subPages = ['notifications', 'settings', 'gethelp'];
+            
+            if (!subPages.includes(pageName)) {
+                window.lastMainPage = pageName;
+                bNav.style.display = 'flex';
+            } else {
+                bNav.style.display = 'none';
+            }
+
+            document.querySelectorAll('.page-container').forEach(el => el.style.display = 'none');
+
+            // IF ALREADY CACHED
+            if (window.loadedPages[pageName]) {
+                document.getElementById(`page-${pageName}`).style.display = 'block';
+                if (pageName === 'profile' && typeof window.updateProfileUI === 'function') window.updateProfileUI();
+                
+                // ADDED: Re-trigger the app version function when visiting gethelp from cache
+                if (pageName === 'gethelp' && typeof displayAppVersion === 'function') displayAppVersion();
+                return;
+            }
+
+            skeletonLoader.classList.add('active'); 
+
+            try {
+                const response = await fetch(`${pageName}.html`);
+                if(!response.ok) throw new Error("Page not found");
+                
+                const htmlText = await response.text();
+                
+                const pageWrapper = document.createElement('div');
+                pageWrapper.id = `page-${pageName}`;
+                pageWrapper.className = 'page-container';
+                pageWrapper.innerHTML = htmlText;
+                
+                contentArea.appendChild(pageWrapper);
+                window.loadedPages[pageName] = true;
+                pageWrapper.style.display = 'block';
+                
+                // UPDATED: Better script re-injection to support external scripts like "version.js" safely
+                const scripts = pageWrapper.querySelectorAll('script');
+                scripts.forEach(oldScript => {
+                    // Prevent version.js from loading twice and throwing an error, but trigger the function
+                    if (oldScript.src && oldScript.src.includes('version.js')) {
+                        if (typeof displayAppVersion === 'function') displayAppVersion();
+                        return; 
+                    }
+                    
+                    const newScript = document.createElement('script');
+                    if (oldScript.src) {
+                        newScript.src = oldScript.src;
+                    } else {
+                        newScript.textContent = oldScript.textContent;
+                    }
+                    document.body.appendChild(newScript).parentNode.removeChild(newScript);
+                });
+
+                // When rendering home initially via cache
+                if (pageName === 'home' && window.pinsData.length > 0) {
+                    document.getElementById('main-feed').innerHTML = window.getFeedHTML(window.pinsData);
+                }
+                
+                // ADDED: Trigger version setup when freshly fetching the page
+                if (pageName === 'gethelp' && typeof displayAppVersion === 'function') {
+                    setTimeout(displayAppVersion, 50); // Small delay to let the DOM settle
+                }
+
+            } catch (error) {
+                console.error(error);
+            } finally {
+                skeletonLoader.classList.remove('active');
+            }
+        };
+
+        window.goBack = function() {
+            const targetPage = window.lastMainPage || 'home';
+            
+            const prevActive = document.querySelector('.nav-item.active');
+            if(prevActive) {
+                prevActive.classList.remove('active');
+                const prevName = prevActive.getAttribute('data-icon');
+                if (prevName !== 'add') prevActive.querySelector('ion-icon').setAttribute('name', `${prevName}-outline`);
+            }
+            
+            const nextActive = document.querySelector(`.nav-item[data-page="${targetPage}"]`);
+            if(nextActive) {
+                nextActive.classList.add('active');
+                nextActive.querySelector('ion-icon').setAttribute('name', nextActive.getAttribute('data-icon'));
+            }
+
+            window.navigateTo(targetPage);
+        };
+
+        window.navigateTo('home');
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const iconName = item.getAttribute('data-icon');
+                if (iconName === 'add') {
+                    document.getElementById('create-backdrop').classList.add('active');
+                    document.getElementById('create-sheet').classList.add('active');
+                    return;
+                }
+                const page = item.getAttribute('data-page');
+                if(!page) return;
+                
+                const prevActive = document.querySelector('.nav-item.active');
+                if(prevActive) {
+                    prevActive.classList.remove('active');
+                    const prevName = prevActive.getAttribute('data-icon');
+                    if (prevName !== 'add') prevActive.querySelector('ion-icon').setAttribute('name', `${prevName}-outline`);
+                }
+
+                item.classList.add('active');
+                item.querySelector('ion-icon').setAttribute('name', iconName);
+                window.navigateTo(page);
+            });
+        });
+
+        // EXACT ORIGINAL FUNCTION - Untouched design!
+        window.getFeedHTML = function(data, isRelated = false) {
+            return data.map(pin => `
+                <div class="pin-card" data-image="${pin.imageUrl}" data-title="${pin.title || ''}">
+                    <div class="pin-image-wrapper detail-trigger skeleton-bg" style="height: ${pin.height}px;">
+                        <img src="${pin.imageUrl}" loading="lazy" decoding="async" onload="this.style.opacity=1; this.parentElement.style.animation='none'; this.parentElement.style.background='transparent';" style="opacity:0; transition: opacity 0.3s ease; width:100%; height:100%; object-fit:cover;">
+                    </div>
+                    ${!isRelated ? `
+                    <div class="pin-footer">
+                        ${pin.title ? `<div class="pin-title">${pin.title}</div>` : `<div></div>`}
+                        <div class="pin-options">
+                            <ion-icon name="ellipsis-horizontal" class="pin-options-trigger"></ion-icon>
+                            <div class="pin-dropdown">
+                                <div class="pin-drop-item action-download">Download</div>
+                                <div class="pin-drop-item action-report" style="color:var(--brand-red);">Report pin</div>
+                            </div>
+                        </div>
+                    </div>` : ''}
+                </div>
+            `).join('');
+        };
+
+        window.downloadContent = function(imgSrc, btnElement = null) {
+            if (btnElement) btnElement.classList.add('bouncing-download');
+            else window.showToast('Downloading image...');
+            
+            fetch(imgSrc)
+                .then(res => res.blob())
+                .then(blob => {
+                    setTimeout(() => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = 'Pinterest_Download.jpg';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        
+                        if (btnElement) {
+                            btnElement.classList.remove('bouncing-download');
+                            const icon = btnElement.querySelector('ion-icon');
+                            icon.setAttribute('name', 'checkmark');
+                            setTimeout(() => icon.setAttribute('name', 'download'), 2000);
+                        } else {
+                            window.showToast('Download complete!');
+                        }
+                    }, 1200); 
+                })
+                .catch(() => {
+                    setTimeout(() => {
+                        window.open(imgSrc, '_blank');
+                        if(btnElement) btnElement.classList.remove('bouncing-download');
+                    }, 1200);
+                });
+        };
+
+        document.getElementById('app-container').addEventListener('click', (e) => {
+            if (e.target.closest('.toast-trigger') || e.target.closest('.save-btn')) {
+                window.showToast('Coming soon');
+                return;
+            }
+
+            const optionsTrigger = e.target.closest('.pin-options-trigger');
+            if (optionsTrigger) {
+                e.stopPropagation();
+                document.querySelectorAll('.pin-dropdown.active').forEach(d => {
+                    if(d !== optionsTrigger.nextElementSibling) d.classList.remove('active');
+                });
+                const dropdown = optionsTrigger.nextElementSibling;
+                if(dropdown) dropdown.classList.toggle('active');
+                return;
+            }
+
+            if(!e.target.closest('.pin-dropdown')) {
+                document.querySelectorAll('.pin-dropdown.active').forEach(d => d.classList.remove('active'));
+            }
+            
+            if(e.target.closest('.action-download')) {
+                e.stopPropagation();
+                const card = e.target.closest('.pin-card');
+                window.downloadContent(card.getAttribute('data-image'));
+                e.target.closest('.pin-dropdown').classList.remove('active');
+                return;
+            }
+            
+            if(e.target.closest('.action-report')) {
+                e.stopPropagation();
+                window.showToast("Post reported");
+                e.target.closest('.pin-dropdown').classList.remove('active');
+                return;
+            }
+
+            const detailTrigger = e.target.closest('.detail-trigger');
+            if (detailTrigger && !e.target.closest('.pin-options')) {
+                const card = detailTrigger.closest('.pin-card');
+                const imgSource = card ? card.getAttribute('data-image') : detailTrigger.src;
+                const title = card ? card.getAttribute('data-title') : detailTrigger.getAttribute('data-title');
+
+                const layer = document.createElement('div');
+                layer.className = 'detail-view';
+                layer.innerHTML = `
+                    <div class="detail-header"><div class="glass-icon back-btn"><ion-icon name="arrow-back"></ion-icon></div></div>
+                    <div class="detail-scroll-area">
+                        <img class="detail-main-img" src="${imgSource}">
+                        <div class="detail-info">
+                            <div class="detail-title-large">${title || 'Explore'}</div>
+                            <div style="display:flex; gap: 8px; align-items:center;">
+                                <div class="action-btn download-btn" style="background:#efefef; color:#111; display:flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:50%; flex-shrink:0;">
+                                    <ion-icon name="download" style="font-size: 28px;"></ion-icon>
+                                </div>
+                                <div class="action-btn primary save-btn">Save</div>
+                            </div>
+                        </div>
+                        <div class="related-heading" style="padding: 0 16px 12px 16px; font-weight:600; font-size:18px;">More like this</div>
+                        <div class="masonry-grid related-feed-container">${window.getFeedHTML([...window.pinsData].sort(() => 0.5 - Math.random()), true)}</div>
+                    </div>
+                `;
+                document.getElementById('app-container').appendChild(layer);
+                requestAnimationFrame(() => layer.classList.add('active'));
+            }
+
+            const backBtn = e.target.closest('.back-btn');
+            if (backBtn) {
+                const currentLayer = backBtn.closest('.detail-view');
+                currentLayer.classList.remove('active');
+                setTimeout(() => currentLayer.remove(), 350);
+            }
+            
+            const downloadBtn = e.target.closest('.download-btn');
+            if (downloadBtn) {
+                const imgLayer = downloadBtn.closest('.detail-view');
+                window.downloadContent(imgLayer.querySelector('.detail-main-img').src, downloadBtn);
+            }
+        });
+
+        // --- Auth Injector Function ---
+        window.openAuthSheet = async function() {
+            if (!document.getElementById('auth-backdrop')) {
+                try {
+                    const response = await fetch('authentication.html');
+                    if (!response.ok) throw new Error("Could not load auth interface");
+                    const htmlText = await response.text();
+                    
+                    const authContainer = document.getElementById('auth-injection-container');
+                    authContainer.innerHTML = htmlText;
+                    
+                    const scripts = authContainer.querySelectorAll('script');
+                    scripts.forEach(oldScript => {
+                        const newScript = document.createElement('script');
+                        if (oldScript.src) newScript.src = oldScript.src;
+                        else newScript.textContent = oldScript.textContent;
+                        document.body.appendChild(newScript).parentNode.removeChild(newScript);
+                    });
+                } catch (err) {
+                    console.error("Auth injection failed:", err);
+                    return;
+                }
+            }
+
+            requestAnimationFrame(() => {
+                document.getElementById('auth-backdrop').classList.add('active');
+                document.getElementById('auth-sheet').classList.add('active');
+            });
+        };
+
+        // --- Upload logic - ADDED: Connection to window.api.uploadPin ---
+        const createBackdrop = document.getElementById('create-backdrop');
+        const createSheet = document.getElementById('create-sheet');
+        const galleryInput = document.getElementById('native-gallery-input');
+        const uploadOverlay = document.getElementById('upload-overlay');
+        const previewContainer = document.getElementById('upload-preview-images');
+        let pendingUploadFiles = [];
+
+        createBackdrop.addEventListener('click', (e) => {
+            if (e.target === createBackdrop) { createBackdrop.classList.remove('active'); createSheet.classList.remove('active'); }
+        });
+
+        document.getElementById('trigger-gallery').addEventListener('click', () => { 
+            if (window.isLoggedIn) {
+                galleryInput.click(); 
+            } else {
+                window.pendingUploadAction = () => galleryInput.click();
+                window.openAuthSheet(); 
+            }
+        });
+
+        galleryInput.addEventListener('change', (e) => {
+            let files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            if (files.length > 5) { window.showToast('Maximum 5 images allowed.'); files = files.slice(0, 5); }
+            pendingUploadFiles = files;
+            createBackdrop.classList.remove('active'); createSheet.classList.remove('active');
+            previewContainer.innerHTML = '';
+            files.forEach(file => previewContainer.innerHTML += `<img src="${URL.createObjectURL(file)}">`);
+            document.getElementById('upload-pin-title').value = '';
+            setTimeout(() => uploadOverlay.classList.add('active'), 200);
+        });
+
+        document.getElementById('close-upload').addEventListener('click', () => {
+            uploadOverlay.classList.remove('active'); pendingUploadFiles = []; galleryInput.value = '';
+        });
+
+        document.getElementById('execute-upload').addEventListener('click', async () => {
+            if (pendingUploadFiles.length === 0) return;
+            const title = document.getElementById('upload-pin-title').value.trim() || 'New Upload';
+            
+            uploadOverlay.classList.remove('active'); 
+
+            await window.navigateTo('home');
+            
+            const bubble = document.getElementById('upload-progress-bubble');
+            bubble.style.display = 'flex';
+            bubble.innerHTML = `<ion-icon name="cloud-upload-outline" style="font-size:20px;"></ion-icon> Uploading to Server...`;
+
+            try {
+                let newlyCreatedPins = [];
+                // Process uploads and send to server API
+                for(let file of pendingUploadFiles) {
+                    let res = await window.api.uploadPin(file, title);
+                    if (res.success) {
+                        // Map the response immediately to your layout structure so it displays right away
+                        newlyCreatedPins.push({
+                            imageUrl: res.pin.secure_url,
+                            title: (res.pin.tags && res.pin.tags.length > 0) ? res.pin.tags[0] : title,
+                            height: Math.floor(Math.random() * (350 - 180 + 1) + 180)
+                        });
+                    }
+                }
+
+                bubble.innerHTML = `<ion-icon name="checkmark-circle" style="font-size:20px;"></ion-icon> Upload Complete!`;
+                
+                if (newlyCreatedPins.length > 0) {
+                    window.pinsData.unshift(...newlyCreatedPins);
+                    const mainFeed = document.getElementById('main-feed');
+                    if (mainFeed) mainFeed.insertAdjacentHTML('afterbegin', window.getFeedHTML(newlyCreatedPins));
+                    
+                    const scrollArea = document.querySelector('.feed-scroll-area'); 
+                    if (scrollArea) scrollArea.scrollTo({top: 0, behavior: 'smooth'}); 
+                }
+                
+                setTimeout(() => { bubble.style.display = 'none'; }, 2000);
+            } catch (err) {
+                bubble.innerHTML = `<ion-icon name="close-circle" style="font-size:20px;"></ion-icon> Upload Failed!`;
+                setTimeout(() => { bubble.style.display = 'none'; }, 2000);
+            }
+            
+            pendingUploadFiles = []; 
+            galleryInput.value = '';
+        });
+    </script>
+</body>
+</html>
