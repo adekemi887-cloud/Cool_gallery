@@ -1,0 +1,159 @@
+--- START OF FILE authentication.html ---
+
+<style>
+    /* Exact original styling */
+    .auth-backdrop { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+    .auth-backdrop.active { opacity: 1; pointer-events: auto; }
+    .auth-sheet { position: absolute; bottom: 0; left: 0; width: 100%; height: 95vh; background: #fff; border-top-left-radius: 32px; border-top-right-radius: 32px; z-index: 1010; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); display: flex; flex-direction: column; padding: 24px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); overflow-y: auto; -ms-overflow-style: none; scrollbar-width: none; }
+    .auth-sheet::-webkit-scrollbar { display: none; }
+    .auth-sheet.active { transform: translateY(0); }
+    .auth-header { display: flex; justify-content: flex-end; width: 100%; flex-shrink: 0; }
+    .auth-close { font-size: 32px; cursor: pointer; color: #111; }
+    .auth-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 10px; padding-bottom: 40px; }
+    .auth-logo { font-size: 48px; color: var(--brand-red); margin-bottom: 16px; }
+    .auth-title { font-size: 28px; font-weight: 600; text-align: center; margin-bottom: 8px; color: var(--text-main); }
+    .auth-subtitle { font-size: 15px; color: var(--text-muted); text-align: center; margin-bottom: 32px; }
+    
+    .auth-input-wrapper { position: relative; width: 100%; margin-bottom: 16px; }
+    .auth-input { width: 100%; padding: 16px; border-radius: 16px; border: 2px solid #e0e0e0; font-size: 16px; outline: none; transition: border-color 0.2s; }
+    .auth-input:focus { border-color: var(--text-main); }
+    .auth-input[type="password"], .auth-input.has-eye { padding-right: 48px; }
+    .auth-eye { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 22px; color: #888; cursor: pointer; }
+    
+    .auth-btn { width: 100%; background: var(--brand-red); color: #fff; border-radius: 24px; padding: 16px; font-size: 16px; font-weight: 600; text-align: center; cursor: pointer; margin-bottom: 24px; border: none; transition: background 0.2s; }
+    .auth-btn:active { background: #cc001f; }
+    .auth-toggle { font-size: 15px; color: var(--text-main); font-weight: 600; cursor: pointer; text-align: center; margin-bottom: 24px; }
+    
+    /* Restored OAuth Divider & Buttons */
+    .oauth-divider { width: 100%; position: relative; text-align: center; margin: 16px 0 24px 0; }
+    .oauth-divider::before { content: ""; position: absolute; left: 0; top: 50%; width: 30%; height: 1px; background: #e0e0e0; }
+    .oauth-divider::after { content: ""; position: absolute; right: 0; top: 50%; width: 30%; height: 1px; background: #e0e0e0; }
+    .oauth-divider span { font-size: 14px; color: var(--text-muted); background: #fff; padding: 0 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .oauth-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; background: #fff; color: var(--text-main); border: 2px solid #e0e0e0; border-radius: 24px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 12px; transition: background 0.2s; }
+    .oauth-btn:active { background: #f5f5f5; }
+    .oauth-btn ion-icon { font-size: 22px; }
+</style>
+
+<div class="auth-backdrop" id="auth-backdrop">
+    <div class="auth-sheet" id="auth-sheet">
+        <div class="auth-header">
+            <ion-icon name="close-outline" class="auth-close" id="auth-close"></ion-icon>
+        </div>
+        <div class="auth-content">
+            <ion-icon name="logo-pinterest" class="auth-logo"></ion-icon>
+            <div class="auth-title" id="auth-title">Welcome to Pinterest</div>
+            <div class="auth-subtitle">Find new ideas to try</div>
+            
+            <div class="auth-input-wrapper">
+                <input type="email" class="auth-input" placeholder="Email address" id="auth-email">
+            </div>
+            <div class="auth-input-wrapper">
+                <input type="password" class="auth-input has-eye" placeholder="Password" id="auth-pass">
+                <ion-icon name="eye-outline" class="auth-eye" onclick="window.togglePasswordVisibility('auth-pass', this)"></ion-icon>
+            </div>
+            <div class="auth-input-wrapper" id="auth-confirm-wrapper" style="display: none;">
+                <input type="password" class="auth-input has-eye" placeholder="Confirm Password" id="auth-confirm-pass">
+                <ion-icon name="eye-outline" class="auth-eye" onclick="window.togglePasswordVisibility('auth-confirm-pass', this)"></ion-icon>
+            </div>
+            
+            <button class="auth-btn" id="auth-submit-btn">Log in</button>
+            <div class="auth-toggle" id="auth-toggle-btn">Not on Pinterest yet? Sign up</div>
+
+            <!-- Restored OAuth Section -->
+            <div class="oauth-divider"><span>Coming soon</span></div>
+            <button class="oauth-btn toast-trigger"><ion-icon name="logo-google"></ion-icon> Continue with Google</button>
+            <button class="oauth-btn toast-trigger"><ion-icon name="logo-apple"></ion-icon> Continue with Apple</button>
+            <button class="oauth-btn toast-trigger" style="color: #1877F2;"><ion-icon name="logo-facebook"></ion-icon> Continue with Facebook</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        let isSignupMode = false;
+        const authBackdrop = document.getElementById('auth-backdrop');
+        const authSheet = document.getElementById('auth-sheet');
+        
+        window.closeAuthSheet = function() {
+            authBackdrop.classList.remove('active');
+            authSheet.classList.remove('active');
+            window.pendingUploadAction = null; 
+            setTimeout(() => {
+                document.getElementById('auth-email').value = '';
+                document.getElementById('auth-pass').value = '';
+                document.getElementById('auth-confirm-pass').value = '';
+                if(isSignupMode) document.getElementById('auth-toggle-btn').click();
+            }, 300);
+        };
+
+        window.togglePasswordVisibility = function(inputId, iconElement) {
+            const inputField = document.getElementById(inputId);
+            if (inputField.type === "password") {
+                inputField.type = "text"; iconElement.setAttribute("name", "eye-off-outline");
+            } else {
+                inputField.type = "password"; iconElement.setAttribute("name", "eye-outline");
+            }
+        };
+
+        document.getElementById('auth-close').addEventListener('click', window.closeAuthSheet);
+        authBackdrop.addEventListener('click', (e) => { if (e.target === authBackdrop) window.closeAuthSheet(); });
+
+        document.getElementById('auth-toggle-btn').addEventListener('click', (e) => {
+            isSignupMode = !isSignupMode;
+            const btn = document.getElementById('auth-submit-btn');
+            const title = document.getElementById('auth-title');
+            const confirmWrapper = document.getElementById('auth-confirm-wrapper');
+            
+            if (isSignupMode) {
+                btn.innerText = 'Sign up'; title.innerText = 'Sign up to see more';
+                e.target.innerText = 'Already a member? Log in'; confirmWrapper.style.display = 'block'; 
+            } else {
+                btn.innerText = 'Log in'; title.innerText = 'Welcome to Pinterest';
+                e.target.innerText = 'Not on Pinterest yet? Sign up'; confirmWrapper.style.display = 'none'; 
+            }
+        });
+
+        // Backend Firebase Registration
+        document.getElementById('auth-submit-btn').addEventListener('click', () => {
+            const email = document.getElementById('auth-email').value.trim();
+            const pass = document.getElementById('auth-pass').value;
+            const confirmPass = document.getElementById('auth-confirm-pass').value;
+            const btn = document.getElementById('auth-submit-btn');
+            
+            if (!email || !pass) return window.showToast("Please enter email and password");
+            if (isSignupMode && pass !== confirmPass) return window.showToast("Passwords do not match!");
+
+            btn.innerText = "Processing...";
+            btn.style.pointerEvents = "none";
+
+            const authAction = isSignupMode 
+                ? firebase.auth().createUserWithEmailAndPassword(email, pass)
+                : firebase.auth().signInWithEmailAndPassword(email, pass);
+
+            authAction.then(async (userCredential) => {
+                const userEmail = userCredential.user.email;
+                await window.api.initChatUser(userEmail);
+
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('userEmail', userEmail);
+                window.isLoggedIn = true;
+                
+                window.showToast(isSignupMode ? "Account created!" : "Logged in successfully!");
+                window.closeAuthSheet();
+                
+                if (typeof window.updateProfileUI === 'function') window.updateProfileUI();
+                if (typeof window.updateSettingsUI === 'function') window.updateSettingsUI();
+
+                if (window.pendingUploadAction) {
+                    setTimeout(() => { window.pendingUploadAction(); window.pendingUploadAction = null; }, 350);
+                }
+            }).catch(error => {
+                window.showToast(error.message);
+            }).finally(() => {
+                btn.innerText = isSignupMode ? "Sign up" : "Log in";
+                btn.style.pointerEvents = "auto";
+            });
+        });
+    })();
+</script>

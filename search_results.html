@@ -1,0 +1,62 @@
+<style>
+    .detail-view { z-index: 400 !important; }
+    .results-tag { padding: 10px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; white-space: nowrap; cursor: pointer; transition: all 0.2s ease; }
+    .results-tag.active { background: #111; color: #fff; border: 1px solid #111; }
+    .results-tag.outline { background: transparent; border: 1px solid #d1d1d1; color: #111; }
+</style>
+
+<div class="tags-scroller" id="filter-tags-container" style="display: flex; gap: 8px; padding: 16px 16px 8px 16px; overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; flex-shrink: 0;">
+    <div class="results-tag active" data-category="All">All Pins</div>
+    <div class="results-tag outline" data-category="Design">Design</div>
+    <div class="results-tag outline" data-category="Wallpaper">Wallpaper</div>
+</div>
+
+<div class="feed-scroll-area" id="search-scroll-area" style="flex: 1; overflow-y: auto; padding: 8px 8px 80px 8px; -ms-overflow-style: none; scrollbar-width: none;">
+    <div class="masonry-grid" id="search-results-grid"></div>
+</div>
+
+<script>
+    (async function() {
+        const grid = document.getElementById('search-results-grid');
+        const scrollArea = document.getElementById('search-scroll-area');
+        
+        // Grab value from search input built in search.html
+        const rawQuery = document.getElementById('actual-input').value.trim();
+        
+        let allSearchPins = [];
+        let currentIndex = 0;
+        const chunkSize = 10;
+
+        function loadMore() {
+            const chunk = allSearchPins.slice(currentIndex, currentIndex + chunkSize);
+            if(chunk.length > 0) {
+                grid.insertAdjacentHTML('beforeend', window.getFeedHTML(chunk));
+                currentIndex += chunkSize;
+            }
+        }
+
+        try {
+            // Hit backend for specific query
+            const response = await window.api.fetchFeed(rawQuery);
+            if (response.success && response.pins) {
+                allSearchPins = response.pins;
+                if (allSearchPins.length === 0) {
+                    grid.innerHTML = '<div style="padding: 40px; text-align: center; color: #888; grid-column: span 2;">No pins found for this tag</div>';
+                } else {
+                    grid.innerHTML = '';
+                    loadMore();
+                }
+            } else {
+                grid.innerHTML = '<div style="padding: 40px; text-align: center; color: #888; grid-column: span 2;">Database Error.</div>';
+            }
+        } catch (e) {
+            grid.innerHTML = '<div style="padding: 40px; text-align: center; color: #888; grid-column: span 2;">Connection failed</div>';
+        }
+
+        scrollArea.addEventListener('scroll', () => {
+            if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 100) {
+                loadMore();
+            }
+        });
+    })();
+</script>

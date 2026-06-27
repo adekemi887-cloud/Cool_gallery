@@ -1,0 +1,158 @@
+<style>
+    /* Existing Styles */
+    .notifications-page { height: 100%; overflow-y: auto; background-color: var(--bg-color, #fff); -ms-overflow-style: none; scrollbar-width: none; }
+    .notifications-page::-webkit-scrollbar { display: none; }
+    
+    .noti-header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 16px; z-index: 10; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #efefef; }
+    .noti-header h1 { font-size: 18px; font-weight: 600; color: var(--text-main, #111); margin: 0; }
+    .noti-back { position: absolute; left: 16px; font-size: 28px; color: var(--text-main, #111); cursor: pointer; }
+    
+    .noti-list { padding: 8px 0; }
+    .noti-row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; cursor: pointer; transition: background 0.2s; }
+    .noti-row:active { background: #f9f9f9; }
+    .noti-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #efefef; flex-shrink: 0; }
+    .noti-content { flex: 1; }
+    .noti-text { font-size: 15px; color: #111; line-height: 1.3; }
+    .noti-text strong { font-weight: 600; }
+    .noti-time { font-size: 13px; color: #888; margin-top: 4px; }
+    .noti-pin-img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #efefef; flex-shrink: 0; }
+    
+    .new-badge { width: 10px; height: 10px; background-color: var(--brand-red, #e60023); border-radius: 50%; flex-shrink: 0; }
+
+    /* --- NEW: Full Screen Notification Styles --- */
+    .noti-fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: var(--bg-color, #fff);
+        z-index: 9999;
+        display: none; /* Hidden by default */
+        flex-direction: column;
+        animation: slideUp 0.3s ease forwards;
+        overflow-y: auto;
+    }
+
+    .noti-fullscreen-content {
+        padding: 40px 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 24px;
+        margin-top: 20px;
+    }
+
+    /* Scaling up elements for the full-screen view */
+    .noti-fullscreen-content .noti-avatar {
+        width: 100px;
+        height: 100px;
+        font-size: 48px !important; /* For icon-based avatars */
+    }
+
+    .noti-fullscreen-content .noti-pin-img {
+        width: 200px;
+        height: 200px;
+        border-radius: 16px;
+        margin-top: 16px;
+    }
+
+    .noti-fullscreen-content .noti-text {
+        font-size: 22px;
+        line-height: 1.5;
+        color: var(--text-main, #111);
+    }
+
+    .noti-fullscreen-content .noti-time {
+        font-size: 16px;
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+</style>
+
+<div class="notifications-page">
+    <div class="noti-header">
+        <ion-icon name="arrow-back" class="noti-back" onclick="window.goBack()"></ion-icon>
+        <h1>Updates</h1>
+    </div>
+    
+    <div class="noti-list">
+        <!-- Added onclick="openNotification(this)" to each row -->
+        <div class="noti-row toast-trigger" onclick="openNotification(this)">
+            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&fit=crop" class="noti-avatar" loading="lazy">
+            <div class="noti-content">
+                <div class="noti-text"><strong>Sarah Collins</strong> saved your pin to <strong>Aesthetic Boards</strong>.</div>
+                <div class="noti-time">2h</div>
+            </div>
+            <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=100&auto=format&fit=crop" class="noti-pin-img" loading="lazy">
+            <div class="new-badge"></div>
+        </div>
+        
+        <div class="noti-row toast-trigger" onclick="openNotification(this)">
+            <div class="noti-avatar" style="background:#111; color:#fff; display:flex; justify-content:center; align-items:center; font-size:24px;">
+                <ion-icon name="color-palette"></ion-icon>
+            </div>
+            <div class="noti-content">
+                <div class="noti-text"><strong>Pinterest</strong> has a new feature! Try the new Collage maker today.</div>
+                <div class="noti-time">1d</div>
+            </div>
+            <div class="new-badge"></div>
+        </div>
+        
+        <div class="noti-row toast-trigger" onclick="openNotification(this)">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&fit=crop" class="noti-avatar" loading="lazy">
+            <div class="noti-content">
+                <div class="noti-text"><strong>Design Daily</strong> and 5 others started following you.</div>
+                <div class="noti-time">3d</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- --- NEW: Full Screen Container --- -->
+<div id="full-notification-view" class="noti-fullscreen">
+    <div class="noti-header">
+        <ion-icon name="arrow-back" class="noti-back" onclick="closeNotification()"></ion-icon>
+        <h1>Notification</h1>
+    </div>
+    <div id="full-notification-content" class="noti-fullscreen-content">
+        <!-- Content gets injected here via Javascript -->
+    </div>
+</div>
+
+<script>
+    function openNotification(element) {
+        // 1. Gather the HTML elements from the clicked row
+        const avatar = element.querySelector('.noti-avatar');
+        const text = element.querySelector('.noti-text');
+        const time = element.querySelector('.noti-time');
+        const pinImg = element.querySelector('.noti-pin-img');
+        const badge = element.querySelector('.new-badge');
+
+        // 2. Remove the "unread" badge if it exists upon clicking
+        if (badge) {
+            badge.style.display = 'none';
+        }
+
+        // 3. Inject the cloned data into our full-screen container
+        const fullScreenContainer = document.getElementById('full-notification-content');
+        fullScreenContainer.innerHTML = `
+            ${avatar ? avatar.outerHTML : ''}
+            <div class="noti-text">${text ? text.innerHTML : ''}</div>
+            <div class="noti-time">${time ? time.innerHTML : ''}</div>
+            ${pinImg ? pinImg.outerHTML : ''}
+        `;
+
+        // 4. Show the full screen view
+        document.getElementById('full-notification-view').style.display = 'flex';
+    }
+
+    function closeNotification() {
+        // Hide the full screen view
+        document.getElementById('full-notification-view').style.display = 'none';
+    }
+</script>

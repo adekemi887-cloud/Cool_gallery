@@ -1,0 +1,75 @@
+<style>
+    /* Styling remains exact */
+    .profile-page { height: 100%; overflow-y: auto; padding-bottom: 90px; background-color: var(--bg-color); -ms-overflow-style: none; scrollbar-width: none; }
+    .profile-page::-webkit-scrollbar { display: none; }
+    .profile-header-actions { display: flex; justify-content: space-between; align-items: center; padding: 16px; font-size: 26px; color: var(--text-main); }
+    .profile-header-left { display: flex; align-items: center; }
+    .login-signup-btn { font-size: 15px; font-weight: 600; color: #fff; background-color: var(--brand-red); padding: 8px 16px; border-radius: 24px; cursor: pointer; transition: background 0.2s; display: none; }
+    .profile-ellipsis-wrapper { position: relative; display: none; }
+    .profile-info { display: flex; flex-direction: column; align-items: center; padding: 0 16px 20px 16px; text-align: center; }
+    .profile-avatar { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background-color: #efefef; }
+    .profile-name { font-size: 32px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90vw; }
+    .profile-email { font-size: 16px; color: #555; margin-bottom: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90vw; }
+    .profile-buttons { display: flex; gap: 12px; margin-bottom: 24px; }
+    .btn-outline { padding: 12px 24px; border-radius: 30px; font-weight: 600; font-size: 16px; background-color: #efefef; color: var(--text-main); cursor: pointer; }
+    .profile-tabs { display: flex; justify-content: center; gap: 24px; border-bottom: 1px solid #efefef; margin-bottom: 16px; }
+    .profile-tab { font-size: 16px; font-weight: 600; padding-bottom: 12px; color: #888; cursor: pointer; position: relative; }
+    .profile-tab.active { color: var(--text-main); }
+    .profile-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 3px; background-color: var(--text-main); }
+    .profile-feed-container { padding: 0 8px; }
+</style>
+
+<div class="profile-page">
+    <div class="profile-header-actions">
+        <div class="profile-header-left">
+            <div class="login-signup-btn" id="profile-auth-btn" onclick="window.openAuthSheet()">Log in / Sign up</div>
+        </div>
+        <ion-icon name="settings-outline" onclick="window.navigateTo('settings')"></ion-icon>
+    </div>
+
+    <div class="profile-info">
+        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&fit=crop" class="profile-avatar" alt="User Avatar" loading="lazy">
+        <div class="profile-name" id="profile-name-display">User</div>
+        <div class="profile-email" id="profile-email-display">placeholder@placeholder.com</div>
+        <div class="profile-buttons">
+            <div class="btn-outline toast-trigger">Edit profile</div>
+            <div class="btn-outline toast-trigger">Share profile</div>
+        </div>
+    </div>
+
+    <div class="profile-tabs">
+        <div class="profile-tab active">Saved</div>
+        <div class="profile-tab toast-trigger">Created</div>
+    </div>
+
+    <div class="profile-feed-container">
+        <div class="masonry-grid" id="profile-saved-feed"></div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // Build mock saved items utilizing the actual globally cached real database items to mimic app behavior
+        const savedPins = window.pinsData ? [...window.pinsData].sort(() => 0.5 - Math.random()).slice(0, 4) : [];
+        const feedElement = document.getElementById('profile-saved-feed');
+        if (window.getFeedHTML) feedElement.innerHTML = window.getFeedHTML(savedPins);
+
+        window.updateProfileUI = function() {
+            const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+            const userEmail = localStorage.getItem('userEmail') || '';
+            const authBtn = document.getElementById('profile-auth-btn');
+            
+            if (isLoggedIn) {
+                if (authBtn) authBtn.style.display = 'none';
+                document.getElementById('profile-name-display').innerText = userEmail.split('@')[0];
+                document.getElementById('profile-email-display').innerText = userEmail;
+            } else {
+                if (authBtn) authBtn.style.display = 'block';
+                document.getElementById('profile-name-display').innerText = 'User';
+                document.getElementById('profile-email-display').innerText = 'placeholder@placeholder.com';
+            }
+        };
+
+        window.updateProfileUI();
+    })();
+</script>

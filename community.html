@@ -1,0 +1,170 @@
+<style>
+    /* Styling matched exactly to the initial setup */
+    .community-page { height: 100%; overflow-y: auto; padding-bottom: 90px; background-color: var(--bg-color); -ms-overflow-style: none; scrollbar-width: none; position: relative; overflow-x: hidden; }
+    .community-page::-webkit-scrollbar { display: none; }
+    .community-header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 20px 16px 10px 16px; z-index: 10; display: flex; justify-content: center; align-items: center; }
+    .community-header h1 { font-size: 18px; font-weight: 600; color: var(--text-main); }
+    .header-bell { position: absolute; right: 16px; font-size: 26px; color: var(--text-main); cursor: pointer; }
+    .community-toggle { display: flex; margin: 10px 16px 20px 16px; background: #efefef; border-radius: 30px; padding: 4px; position: relative; z-index: 5; }
+    .toggle-btn { flex: 1; text-align: center; padding: 10px 0; border-radius: 26px; font-size: 15px; font-weight: 600; color: #555; transition: background 0.3s; cursor: pointer; }
+    .toggle-btn.active { background: #fff; color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .tab-view { display: none; padding: 0 16px; flex-direction: column; gap: 20px; animation: fadeIn 0.3s ease; }
+    .tab-view.active { display: flex; }
+    .chat-row { display: flex; align-items: center; gap: 16px; cursor: pointer; }
+    .user-avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: #efefef; flex-shrink: 0; }
+    .chat-text { flex: 1; overflow: hidden; }
+    .chat-name { font-size: 16px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
+    .chat-last-msg { font-size: 14px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .slide-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 300; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); display: flex; flex-direction: column; }
+    .slide-overlay.active { transform: translateX(0); }
+    .chat-detail-header { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #efefef; background: #fff; z-index: 10; position: relative; }
+    .back-arrow { font-size: 30px; color: #111; cursor: pointer; }
+    .chat-header-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+    .chat-header-name { flex: 1; font-size: 18px; font-weight: 600; color: #111; }
+    .chat-history { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: #f9f9f9; }
+    .chat-bubble { max-width: 75%; padding: 12px 16px; border-radius: 20px; font-size: 15px; line-height: 1.4; word-wrap: break-word; }
+    .bubble-them { background: #efefef; color: #111; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .bubble-me { background: #111; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .chat-input-area { padding: 12px 16px; border-top: 1px solid #efefef; background: #fff; display: flex; gap: 12px; align-items: center; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+    .chat-input-area input { flex: 1; background: #efefef; border: none; border-radius: 24px; padding: 12px 16px; font-size: 16px; outline: none; min-width: 0; }
+    .chat-send-btn { font-size: 28px; color: var(--brand-red); cursor: pointer; display: flex; justify-content: center; align-items: center; }
+</style>
+
+<div class="community-page">
+    <div class="community-header">
+        <h1>Updates</h1>
+        <ion-icon name="notifications" class="header-bell" onclick="window.navigateTo('notifications')"></ion-icon>
+    </div>
+
+    <div class="community-toggle">
+        <div class="toggle-btn active" id="btn-inbox">Inbox Messages</div>
+    </div>
+
+    <div class="tab-view active" id="view-inbox">
+        <!-- Fetched from Backend via JS -->
+    </div>
+
+    <div class="slide-overlay" id="overlay-chat" style="z-index: 310;">
+        <div class="chat-detail-header">
+            <ion-icon name="arrow-back" class="close-chat-btn back-arrow"></ion-icon>
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&fit=crop" id="chat-header-img" class="chat-header-avatar">
+            <div class="chat-header-name" id="chat-header-name">Name</div>
+        </div>
+        
+        <div class="chat-history" id="chat-history">
+            <!-- Messages fetched via backend -->
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" placeholder="Send a message" id="chat-input-box">
+            <div class="chat-send-btn" id="chat-send-btn"><ion-icon name="send"></ion-icon></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        if(window.chatPollingInterval) clearInterval(window.chatPollingInterval);
+        
+        const viewInbox = document.getElementById('view-inbox');
+        const overlayChat = document.getElementById('overlay-chat');
+        const chatHeaderName = document.getElementById('chat-header-name');
+        const chatHistory = document.getElementById('chat-history');
+        const chatInputBox = document.getElementById('chat-input-box');
+        
+        let currentUserEmail = localStorage.getItem('userEmail');
+        let activeChatEmail = null;
+
+        async function loadInbox() {
+            if (!currentUserEmail) { viewInbox.innerHTML = '<div style="padding:20px;text-align:center;">Login to see messages</div>'; return; }
+            const res = await window.api.fetchChatDB();
+            
+            if (res.success && res.data) {
+                const users = res.data.users.filter(u => u !== currentUserEmail);
+                let html = '';
+                
+                users.forEach(u => {
+                    // Filter down to get the absolute last message for context
+                    const msgs = res.data.messages.filter(m => (m.sender === u && m.receiver === currentUserEmail) || (m.receiver === u && m.sender === currentUserEmail));
+                    const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].text : 'Start a conversation';
+                    
+                    html += `
+                    <div class="chat-row action-open-chat" data-email="${u}">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&fit=crop" class="user-avatar" loading="lazy">
+                        <div class="chat-text">
+                            <div class="chat-name">${u.split('@')[0]}</div>
+                            <div class="chat-last-msg">${lastMsg}</div>
+                        </div>
+                    </div>`;
+                });
+                
+                if (html === '') html = '<div style="padding:20px;text-align:center;">No other users in DB yet.</div>';
+                viewInbox.innerHTML = html;
+                
+                // Add click events to newly injected rows
+                document.querySelectorAll('.action-open-chat').forEach(row => {
+                    row.addEventListener('click', () => {
+                        activeChatEmail = row.getAttribute('data-email');
+                        chatHeaderName.innerText = activeChatEmail.split('@')[0];
+                        overlayChat.classList.add('active');
+                        loadMessages(); // Instantly pull when opening
+                    });
+                });
+            }
+        }
+
+        async function loadMessages() {
+            if(!activeChatEmail || !currentUserEmail) return;
+            const res = await window.api.fetchChatDB();
+            
+            if (res.success && res.data) {
+                const history = res.data.messages.filter(m => (m.sender === currentUserEmail && m.receiver === activeChatEmail) || (m.sender === activeChatEmail && m.receiver === currentUserEmail));
+                
+                chatHistory.innerHTML = '';
+                history.forEach(m => {
+                    const bubble = document.createElement('div');
+                    bubble.className = `chat-bubble ${m.sender === currentUserEmail ? 'bubble-me' : 'bubble-them'}`;
+                    bubble.innerText = m.text;
+                    chatHistory.appendChild(bubble);
+                });
+                // Keep visually scrolled down on load
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        }
+
+        // Global interval looping database checks ensuring real-time behavior
+        window.chatPollingInterval = setInterval(() => {
+            if (overlayChat.classList.contains('active')) loadMessages();
+            else loadInbox();
+        }, 3000);
+
+        // Immediate fire to prevent waiting 3 seconds
+        loadInbox();
+
+        document.querySelector('.close-chat-btn').addEventListener('click', () => { 
+            overlayChat.classList.remove('active'); 
+            activeChatEmail = null;
+            loadInbox();
+        });
+
+        document.getElementById('chat-send-btn').addEventListener('click', sendTextMsg);
+        chatInputBox.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendTextMsg(); });
+
+        async function sendTextMsg() {
+            const text = chatInputBox.value.trim();
+            if (text === '' || !activeChatEmail) return;
+            chatInputBox.value = '';
+
+            // Optimistic fast render
+            const newBubble = document.createElement('div');
+            newBubble.className = 'chat-bubble bubble-me';
+            newBubble.innerText = text;
+            chatHistory.appendChild(newBubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            // Submit to backend
+            await window.api.sendMessage(currentUserEmail, activeChatEmail, text);
+        }
+    })();
+</script>

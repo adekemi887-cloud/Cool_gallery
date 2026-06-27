@@ -1,0 +1,96 @@
+--- START OF FILE settings.html ---
+
+<style>
+    /* Exact original styles */
+    .settings-page { height: 100%; overflow-y: auto; background-color: #f9f9f9; -ms-overflow-style: none; scrollbar-width: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .settings-page::-webkit-scrollbar { display: none; }
+    .settings-header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 16px; z-index: 10; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #efefef; }
+    .settings-header h1 { font-size: 18px; font-weight: 600; color: var(--text-main); margin: 0; }
+    .settings-back { position: absolute; left: 16px; font-size: 28px; color: var(--text-main); cursor: pointer; }
+    .settings-group { background: #fff; margin-bottom: 12px; border-top: 1px solid #efefef; border-bottom: 1px solid #efefef; }
+    a.settings-row { text-decoration: none; color: inherit; display: flex; }
+    .settings-row { display: flex; align-items: center; gap: 16px; padding: 16px; border-bottom: 1px solid #efefef; cursor: pointer; }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row:active { background: #f5f5f5; }
+    .settings-icon { font-size: 22px; color: #111; }
+    .settings-text { flex: 1; font-size: 16px; font-weight: 500; color: #111; }
+    .settings-chevron { font-size: 20px; color: #aaa; }
+    .settings-section-title { padding: 24px 16px 8px 16px; font-size: 13px; font-weight: 600; color: #777; text-transform: uppercase; }
+    .settings-action-btn { background: #efefef; font-weight: 600; padding: 14px; border-radius: 24px; display: flex; justify-content: center; align-items: center; width: 100%; cursor: pointer; transition: background 0.2s; height: 50px; }
+    .settings-action-btn:active { background: #e0e0e0; }
+    .app-version-text { margin-top: 16px; font-size: 13px; color: #999; font-weight: 500; text-transform: uppercase; }
+    .bouncing-loader { display: flex; justify-content: center; align-items: center; gap: 6px; }
+    .bouncing-loader div { width: 8px; height: 8px; background-color: var(--brand-red, #E60023); border-radius: 50%; animation: bounce-dots 0.5s infinite alternate; }
+    .bouncing-loader div:nth-child(2) { animation-delay: 0.15s; }
+    .bouncing-loader div:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce-dots { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+</style>
+
+<div class="settings-page">
+    <div class="settings-header">
+        <ion-icon name="arrow-back" class="settings-back" onclick="window.goBack()"></ion-icon>
+        <h1>Settings</h1>
+    </div>
+    
+    <div class="settings-section-title">Personal Information</div>
+    <div class="settings-group">
+        <div class="settings-row toast-trigger"><ion-icon name="person-outline" class="settings-icon"></ion-icon><div class="settings-text">Public profile</div><ion-icon name="chevron-forward" class="settings-chevron"></ion-icon></div>
+        <div class="settings-row toast-trigger"><ion-icon name="shield-checkmark-outline" class="settings-icon"></ion-icon><div class="settings-text">Account management</div><ion-icon name="chevron-forward" class="settings-chevron"></ion-icon></div>
+    </div>
+    
+    <!-- Restored Preferences block exactly as it was -->
+    <div class="settings-section-title">Preferences</div>
+    <div class="settings-group">
+        <div class="settings-row toast-trigger"><ion-icon name="notifications-outline" class="settings-icon"></ion-icon><div class="settings-text">Notifications</div><ion-icon name="chevron-forward" class="settings-chevron"></ion-icon></div>
+        <div class="settings-row toast-trigger"><ion-icon name="lock-closed-outline" class="settings-icon"></ion-icon><div class="settings-text">Privacy and data</div><ion-icon name="chevron-forward" class="settings-chevron"></ion-icon></div>
+        <div class="settings-row toast-trigger"><ion-icon name="moon-outline" class="settings-icon"></ion-icon><div class="settings-text">Dark theme</div><ion-icon name="chevron-forward" class="settings-chevron"></ion-icon></div>
+    </div>
+    
+    <div class="settings-section-title">Support</div>
+    <div class="settings-group">
+        <div class="settings-row" onclick="window.navigateTo('gethelp')"><ion-icon name="help-circle-outline" class="settings-icon"></ion-icon><div class="settings-text">Get help</div><ion-icon name="chevron-forward" class="settings-chevron"></ion-icon></div>
+        <a href="https://example.com/about" target="_blank" class="settings-row"><ion-icon name="information-circle-outline" class="settings-icon"></ion-icon><div class="settings-text">About App</div><ion-icon name="chevron-forward" class="settings-chevron"></ion-icon></a>
+    </div>
+    
+    <div style="padding: 24px; text-align: center;">
+        <div class="settings-action-btn" id="settings-auth-btn">Log out</div>
+        <div id="settings-app-version-display" class="app-version-text"></div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const authBtn = document.getElementById('settings-auth-btn');
+        const versionDisplay = document.getElementById('settings-app-version-display');
+        if (versionDisplay && typeof APP_VERSION !== 'undefined') versionDisplay.textContent = `Version ${APP_VERSION}`;
+
+        window.updateSettingsUI = function() {
+            const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+            if (isLoggedIn) {
+                authBtn.innerHTML = 'Log out'; authBtn.style.color = 'var(--brand-red, #E60023)';
+                authBtn.onclick = handleLogout;
+            } else {
+                authBtn.innerHTML = 'Log in / Sign up'; authBtn.style.color = 'var(--text-main, #111)';
+                authBtn.onclick = function() { if (typeof window.openAuthSheet === 'function') window.openAuthSheet(); };
+            }
+        };
+
+        function handleLogout() {
+            authBtn.innerHTML = `<div class="bouncing-loader"><div></div><div></div><div></div></div>`;
+            authBtn.style.pointerEvents = 'none';
+
+            firebase.auth().signOut().then(() => {
+                localStorage.removeItem('isLoggedIn');
+                localStorage.removeItem('userEmail');
+                window.isLoggedIn = false; 
+                
+                authBtn.style.pointerEvents = 'auto'; 
+                window.updateSettingsUI();
+                if (typeof window.updateProfileUI === 'function') window.updateProfileUI();
+                if (window.showToast) window.showToast("Logged out successfully");
+            });
+        }
+
+        window.updateSettingsUI();
+    })();
+</script>

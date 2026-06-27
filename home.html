@@ -1,0 +1,91 @@
+
+<style>
+    .home-dropdown { position: absolute; top: 50px; right: 0; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: none; flex-direction: column; overflow: hidden; min-width: 180px; z-index: 200; transform-origin: top right; }
+    .home-dropdown.active { display: flex; animation: dropFadeIn 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); }
+    
+    .home-dropdown .dropdown-item { display: block; padding: 14px 16px; font-size: 15px; font-weight: 500; color: #111; cursor: pointer; border-bottom: 1px solid #f0f0f0; text-align: left; text-decoration: none; }
+    .home-dropdown .dropdown-item:hover { background-color: #f9f9f9; }
+    .home-dropdown .dropdown-item:last-child { border-bottom: none; }
+
+    /* ADDED: 3-dots Bouncing Loader Animation */
+    .home-loader-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 6px; z-index: 50; }
+    .home-loader-dot { width: 10px; height: 10px; background-color: var(--brand-red, #E60023); border-radius: 50%; animation: bounce-dots 0.5s infinite alternate; }
+    .home-loader-dot:nth-child(2) { animation-delay: 0.15s; }
+    .home-loader-dot:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce-dots { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+</style>
+
+<header class="app-header">
+  <div class="glass-icon" onclick="window.navigateTo('notifications')">
+      <ion-icon name="notifications"></ion-icon>
+  </div>
+  <div class="glass-icon" id="home-menu-trigger" style="position:relative;">
+    <ion-icon name="ellipsis-horizontal"></ion-icon>
+    <div class="home-dropdown" id="home-dropdown">
+        <a href="https://aboutus.example.com" target="_blank" class="dropdown-item">About app</a>
+        <a href="https://report.example.com" target="_blank" class="dropdown-item">Report a problem</a>
+        <a href="https://terms.example.com" target="_blank" class="dropdown-item">Terms of Service</a>
+    </div>
+  </div>
+</header>
+
+<div class="feed-scroll-area" style="position: relative; height: 100%;">
+  <!-- The Bouncing Loader -->
+  <div id="home-loader" class="home-loader-container">
+      <div class="home-loader-dot"></div><div class="home-loader-dot"></div><div class="home-loader-dot"></div>
+  </div>
+
+  <div class="masonry-grid" id="main-feed"></div>
+</div>
+
+<script>
+    (async function() {
+        const trigger = document.getElementById('home-menu-trigger');
+        const dropdown = document.getElementById('home-dropdown');
+
+        trigger.addEventListener('click', function(e) {
+            if (e.target.closest('.dropdown-item')) {
+                dropdown.classList.remove('active');
+                return; 
+            }
+            dropdown.classList.toggle('active');
+        });
+
+        document.addEventListener('click', function(e) {
+            if (trigger && !trigger.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        // --- ADDED: API Fetch Logic mapped to your exact original format ---
+        const mainFeed = document.getElementById('main-feed');
+        const loader = document.getElementById('home-loader');
+
+        try {
+            // Fetch from your server.js API
+            const response = await window.api.fetchFeed();
+            
+            if (response.success && response.pins && response.pins.length > 0) {
+                // Map the server data to match your EXACT dummy data structure so your layout stays perfect
+                const serverPinsFormatted = response.pins.map(serverPin => ({
+                    imageUrl: serverPin.secure_url,
+                    title: (serverPin.tags && serverPin.tags.length > 0) ? serverPin.tags[0] : 'Explore',
+                    height: Math.floor(Math.random() * (350 - 180 + 1) + 180) // Generates the beautiful masonry heights!
+                }));
+
+                window.pinsData = serverPinsFormatted;
+                
+                // Use your EXACT getFeedHTML function
+                mainFeed.innerHTML = window.getFeedHTML(window.pinsData);
+            } else {
+                mainFeed.innerHTML = '<div style="padding: 40px; text-align: center; color: #888; grid-column: span 2;">No pins available.</div>';
+            }
+        } catch (error) {
+            console.error("Home feed error:", error);
+            mainFeed.innerHTML = '<div style="padding: 40px; text-align: center; color: #888; grid-column: span 2;">Unable to load feed.</div>';
+        } finally {
+            // Hide the bouncing dots
+            if (loader) loader.style.display = 'none';
+        }
+    })();
+</script>
